@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+from __future__ import annotations
 """
 xTTS — Lightweight TTS microservice using edge-tts
 Calls edge-tts Python library directly (no subprocess) for maximum speed.
@@ -184,7 +185,7 @@ async def _process_chunk(
                     await asyncio.sleep(attempt * 1.5)
                     log.info(f"[{job_id}] Chunk {idx+1}/{total}: retry {attempt}/{MAX_RETRIES}")
 
-                communicate = edge_tts.Communicate(text, voice, rate=rate)
+                communicate = edge_tts.Communicate(text, voice, rate=rate, boundary='WordBoundary')
                 audio_buf = io.BytesIO()
                 captions = []
 
