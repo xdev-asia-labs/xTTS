@@ -1,0 +1,21 @@
+services:
+  xtts:
+    build: .
+    container_name: xtts
+    restart: unless-stopped
+    ports:
+      - "3099:3099"
+    environment:
+      - PORT=3099
+      - TTS_MAX_CHUNK=500
+      - TTS_MAX_RETRIES=3
+      - TTS_MAX_TEXT_LENGTH=20000
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3099/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          memory: 512M
