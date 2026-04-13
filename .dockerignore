@@ -8,6 +8,7 @@ node_modules/
 .gitignore
 *.md
 *.txt
+!requirements.txt
 tests/
 Makefile
 .dockerignore
