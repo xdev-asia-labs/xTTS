@@ -33,6 +33,6 @@ class LRUCache:
         return len(self._cache)
 
 
-def cache_key(text: str, voice: str, rate: str) -> str:
-    raw = f"{text}|{voice}|{rate}"
+def cache_key(text: str, voice: str, rate: str, volume: str = "+0%", pitch: str = "+0Hz") -> str:
+    raw = f"{text}|{voice}|{rate}|{volume}|{pitch}"
     return hashlib.sha256(raw.encode()).hexdigest()

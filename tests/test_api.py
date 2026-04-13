@@ -1,9 +1,9 @@
 """Unit tests for cache and models — no network required."""
-from app.cache import LRUCache, cache_key
-from app.models import TTSRequest
-
 import pytest
 from pydantic import ValidationError
+
+from app.cache import LRUCache, cache_key
+from app.models import TTSRequest
 
 
 class TestLRUCache:
@@ -54,12 +54,24 @@ class TestCacheKey:
         k2 = cache_key("hello", "vi-VN-HoaiMyNeural", "+10%")
         assert k1 != k2
 
+    def test_different_for_different_volume(self):
+        k1 = cache_key("hello", "vi-VN-HoaiMyNeural", "+0%", "+0%")
+        k2 = cache_key("hello", "vi-VN-HoaiMyNeural", "+0%", "+50%")
+        assert k1 != k2
+
+    def test_different_for_different_pitch(self):
+        k1 = cache_key("hello", "vi-VN-HoaiMyNeural", "+0%", "+0%", "+0Hz")
+        k2 = cache_key("hello", "vi-VN-HoaiMyNeural", "+0%", "+0%", "+50Hz")
+        assert k1 != k2
+
 
 class TestTTSRequestValidation:
     def test_valid_defaults(self):
         req = TTSRequest(text="Hello")
         assert req.voice == "vi-VN-HoaiMyNeural"
         assert req.rate == "+0%"
+        assert req.volume == "+0%"
+        assert req.pitch == "+0Hz"
 
     def test_valid_rate_formats(self):
         for rate in ["+0%", "-10%", "+50%", "-100%"]:
@@ -69,6 +81,24 @@ class TestTTSRequestValidation:
     def test_invalid_rate_format(self):
         with pytest.raises(ValidationError):
             TTSRequest(text="Hello", rate="fast")
+
+    def test_valid_volume_formats(self):
+        for vol in ["+0%", "-50%", "+100%"]:
+            req = TTSRequest(text="Hello", volume=vol)
+            assert req.volume == vol
+
+    def test_invalid_volume_format(self):
+        with pytest.raises(ValidationError):
+            TTSRequest(text="Hello", volume="loud")
+
+    def test_valid_pitch_formats(self):
+        for pitch in ["+0Hz", "-50Hz", "+100Hz"]:
+            req = TTSRequest(text="Hello", pitch=pitch)
+            assert req.pitch == pitch
+
+    def test_invalid_pitch_format(self):
+        with pytest.raises(ValidationError):
+            TTSRequest(text="Hello", pitch="high")
 
     def test_invalid_voice_format(self):
         with pytest.raises(ValidationError):

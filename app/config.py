@@ -26,6 +26,10 @@ class Settings(BaseSettings):
     # CORS
     tts_cors_origins: str = "*"
 
+    # Rate limiting (POST endpoints only)
+    rate_limit_max: int = 30
+    rate_limit_window: int = 60
+
     # Captions
     fps: int = 30
     caption_max_words: int = 6

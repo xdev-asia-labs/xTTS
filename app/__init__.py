@@ -7,13 +7,15 @@ from __future__ import annotations
 
 import logging
 from contextlib import asynccontextmanager
+from pathlib import Path
 
-import edge_tts
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 
 from app.config import settings
+from app.rate_limit import RateLimitMiddleware
 from app.routes import system_router, tts_router
 from app.tts_engine import tts_cache
 
@@ -62,6 +64,13 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
+    # Rate limiting
+    application.add_middleware(
+        RateLimitMiddleware,
+        max_requests=settings.rate_limit_max,
+        window_seconds=settings.rate_limit_window,
+    )
+
     # Global error handler
     @application.exception_handler(Exception)
     async def global_exception_handler(request: Request, exc: Exception):
@@ -77,5 +86,10 @@ def create_app() -> FastAPI:
     # Routes
     application.include_router(system_router)
     application.include_router(tts_router)
+
+    # Static files (Web UI)
+    static_dir = Path(__file__).resolve().parent.parent / "static"
+    if static_dir.is_dir():
+        application.mount("/", StaticFiles(directory=str(static_dir), html=True), name="static")
 
     return application

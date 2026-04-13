@@ -57,6 +57,8 @@ async def generate_tts(
     text: str,
     voice: str,
     rate: str,
+    volume: str = "+0%",
+    pitch: str = "+0Hz",
 ) -> tuple[bytes, list[Caption], float, int, bool]:
     """
     Returns (audio_bytes, captions, duration_seconds, num_chunks, from_cache).
@@ -74,7 +76,7 @@ async def generate_tts(
     stats["requests_total"] += 1
 
     # Check cache
-    ckey = cache_key(text, voice, rate)
+    ckey = cache_key(text, voice, rate, volume, pitch)
     cached = tts_cache.get(ckey)
     if cached is not None:
         stats["cache_hits"] += 1
@@ -91,7 +93,7 @@ async def generate_tts(
 
     semaphore = asyncio.Semaphore(settings.tts_concurrency)
     tasks = [
-        _process_chunk(semaphore, chunks[i], i, len(chunks), voice, rate, job_id)
+        _process_chunk(semaphore, chunks[i], i, len(chunks), voice, rate, volume, pitch, job_id)
         for i in range(len(chunks))
     ]
     results = await asyncio.gather(*tasks, return_exceptions=True)
@@ -141,6 +143,8 @@ async def _process_chunk(
     total: int,
     voice: str,
     rate: str,
+    volume: str,
+    pitch: str,
     job_id: str,
 ) -> tuple[bytes, list[dict], float]:
     """Returns (mp3_bytes, captions_list, duration_seconds)."""
@@ -151,10 +155,13 @@ async def _process_chunk(
                 if attempt > 1:
                     await asyncio.sleep(attempt * 1.5)
                     log.info(
-                        f"[{job_id}] Chunk {idx+1}/{total}: retry {attempt}/{settings.tts_max_retries}"
+                        f"[{job_id}] Chunk {idx+1}/{total}: "
+                        f"retry {attempt}/{settings.tts_max_retries}"
                     )
 
-                communicate = edge_tts.Communicate(text, voice, rate=rate)
+                communicate = edge_tts.Communicate(
+                    text, voice, rate=rate, volume=volume, pitch=pitch
+                )
                 audio_buf = io.BytesIO()
                 captions: list[dict] = []
 

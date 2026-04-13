@@ -7,10 +7,10 @@ import json
 import time
 
 from fastapi import APIRouter
+from fastapi.responses import StreamingResponse
 
 from app.models import TTSRequest, TTSResponse
 from app.tts_engine import generate_tts
-from fastapi.responses import StreamingResponse
 
 router = APIRouter(tags=["TTS"])
 
@@ -20,7 +20,7 @@ async def tts(req: TTSRequest):
     """Generate TTS audio (base64 JSON response)."""
     t0 = time.time()
     audio, captions, duration, num_chunks, cached = await generate_tts(
-        req.text, req.voice, req.rate
+        req.text, req.voice, req.rate, req.volume, req.pitch
     )
     elapsed = round(time.time() - t0, 3)
 
@@ -39,7 +39,7 @@ async def tts(req: TTSRequest):
 async def tts_stream(req: TTSRequest):
     """Generate TTS audio (raw MP3 stream — ideal for browser <audio>)."""
     audio, captions, duration, num_chunks, cached = await generate_tts(
-        req.text, req.voice, req.rate
+        req.text, req.voice, req.rate, req.volume, req.pitch
     )
 
     captions_json = json.dumps(

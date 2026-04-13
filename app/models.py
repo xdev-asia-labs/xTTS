@@ -6,12 +6,16 @@ import re
 from pydantic import BaseModel, Field, field_validator
 
 RATE_PATTERN = re.compile(r"^[+-]\d{1,3}%$")
+VOLUME_PATTERN = re.compile(r"^[+-]\d{1,3}%$")
+PITCH_PATTERN = re.compile(r"^[+-]\d{1,3}Hz$")
 
 
 class TTSRequest(BaseModel):
     text: str
     voice: str = "vi-VN-HoaiMyNeural"
     rate: str = "+0%"
+    volume: str = "+0%"
+    pitch: str = "+0Hz"
 
     @field_validator("rate")
     @classmethod
@@ -19,6 +23,24 @@ class TTSRequest(BaseModel):
         if not RATE_PATTERN.match(v):
             raise ValueError(
                 f"Invalid rate format '{v}'. Expected: +0%, -10%, +50%, etc."
+            )
+        return v
+
+    @field_validator("volume")
+    @classmethod
+    def validate_volume(cls, v: str) -> str:
+        if not VOLUME_PATTERN.match(v):
+            raise ValueError(
+                f"Invalid volume format '{v}'. Expected: +0%, -50%, +100%, etc."
+            )
+        return v
+
+    @field_validator("pitch")
+    @classmethod
+    def validate_pitch(cls, v: str) -> str:
+        if not PITCH_PATTERN.match(v):
+            raise ValueError(
+                f"Invalid pitch format '{v}'. Expected: +0Hz, -50Hz, +100Hz, etc."
             )
         return v
 
