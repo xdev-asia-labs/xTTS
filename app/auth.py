@@ -47,11 +47,15 @@ class ApiKeyMiddleware(BaseHTTPMiddleware):
         if not provided:
             return JSONResponse(
                 status_code=401,
-                content={"error": "Missing API key", "detail": "Provide X-API-Key header or ?api_key= param"},
+                content={
+                    "error": "Missing API key",
+                    "detail": "Provide X-API-Key header or ?api_key= param",
+                },
             )
 
         if not hmac.compare_digest(provided, self.api_key):
-            log.warning(f"Invalid API key from {request.client.host if request.client else 'unknown'}")
+            client_ip = request.client.host if request.client else "unknown"
+            log.warning(f"Invalid API key from {client_ip}")
             return JSONResponse(
                 status_code=403,
                 content={"error": "Invalid API key"},

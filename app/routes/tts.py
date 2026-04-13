@@ -1,7 +1,6 @@
 """TTS API routes — POST /tts, POST /tts/stream, POST /tts/async."""
 from __future__ import annotations
 
-import asyncio
 import base64
 import io
 import json

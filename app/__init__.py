@@ -17,7 +17,8 @@ from fastapi.staticfiles import StaticFiles
 
 from app.auth import ApiKeyMiddleware
 from app.config import settings
-from app.metrics import MetricsMiddleware, router as metrics_router
+from app.metrics import MetricsMiddleware
+from app.metrics import router as metrics_router
 from app.rate_limit import RateLimitMiddleware
 from app.routes import system_router, tts_router
 from app.tts_engine import tts_cache

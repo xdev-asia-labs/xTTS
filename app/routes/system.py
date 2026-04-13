@@ -6,8 +6,8 @@ import time
 import edge_tts
 from fastapi import APIRouter
 
-from app.config import settings
 from app import tts_engine
+from app.config import settings
 from app.tts_engine import ensure_voices_loaded, stats, tts_cache
 
 router = APIRouter(tags=["System"])
