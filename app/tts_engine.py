@@ -38,7 +38,10 @@ async def ensure_voices_loaded():
     """Ensure voices list is loaded for validation."""
     global voices_list, voice_names
     if voices_list is None:
-        voices_list = await edge_tts.list_voices()
+        result = await edge_tts.list_voices()
+        if not result:
+            raise RuntimeError("edge_tts.list_voices() returned empty/None")
+        voices_list = result
         voice_names = {v["ShortName"] for v in voices_list}
 
 
@@ -59,6 +62,7 @@ async def generate_tts(
     rate: str,
     volume: str = "+0%",
     pitch: str = "+0Hz",
+    ssml: bool = False,
 ) -> tuple[bytes, list[Caption], float, int, bool]:
     """
     Returns (audio_bytes, captions, duration_seconds, num_chunks, from_cache).
@@ -86,9 +90,13 @@ async def generate_tts(
     stats["cache_misses"] += 1
 
     job_id = hashlib.md5(text.encode()).hexdigest()[:8]
-    log.info(f"[{job_id}] TTS: {len(text)} chars, voice={voice}")
+    log.info(f"[{job_id}] TTS: {len(text)} chars, voice={voice}, ssml={ssml}")
 
-    chunks = split_text_into_chunks(text, settings.tts_max_chunk)
+    # SSML mode: send as single chunk (SSML has its own structure)
+    if ssml:
+        chunks = [text]
+    else:
+        chunks = split_text_into_chunks(text, settings.tts_max_chunk)
     log.info(f"[{job_id}] {len(chunks)} chunks")
 
     semaphore = asyncio.Semaphore(settings.tts_concurrency)
@@ -165,19 +173,22 @@ async def _process_chunk(
                 audio_buf = io.BytesIO()
                 captions: list[dict] = []
 
-                async for chunk in communicate.stream():
-                    if chunk["type"] == "audio":
-                        audio_buf.write(chunk["data"])
-                    elif chunk["type"] == "WordBoundary":
-                        offset_ms = chunk["offset"] / 10_000  # 100ns → ms
-                        duration_ms = chunk["duration"] / 10_000
-                        captions.append({
-                            "startFrame": round(offset_ms / 1000 * settings.fps),
-                            "endFrame": round(
-                                (offset_ms + duration_ms) / 1000 * settings.fps
-                            ),
-                            "text": chunk["text"],
-                        })
+                async def _stream():
+                    async for chunk in communicate.stream():
+                        if chunk["type"] == "audio":
+                            audio_buf.write(chunk["data"])
+                        elif chunk["type"] == "WordBoundary":
+                            offset_ms = chunk["offset"] / 10_000  # 100ns → ms
+                            duration_ms = chunk["duration"] / 10_000
+                            captions.append({
+                                "startFrame": round(offset_ms / 1000 * settings.fps),
+                                "endFrame": round(
+                                    (offset_ms + duration_ms) / 1000 * settings.fps
+                                ),
+                                "text": chunk["text"],
+                            })
+
+                await asyncio.wait_for(_stream(), timeout=settings.tts_timeout)
 
                 audio_data = audio_buf.getvalue()
                 if len(audio_data) < 100:

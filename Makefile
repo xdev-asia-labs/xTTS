@@ -4,6 +4,9 @@
 dev:
 	uvicorn server:app --host 0.0.0.0 --port 3099 --reload
 
+mcp:
+	uvicorn mcp_server:app --host 127.0.0.1 --port 3100 --reload
+
 install:
 	pip install -e ".[dev]"
 

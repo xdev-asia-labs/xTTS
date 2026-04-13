@@ -7,7 +7,8 @@ import edge_tts
 from fastapi import APIRouter
 
 from app.config import settings
-from app.tts_engine import ensure_voices_loaded, stats, tts_cache, voices_list
+from app import tts_engine
+from app.tts_engine import ensure_voices_loaded, stats, tts_cache
 
 router = APIRouter(tags=["System"])
 
@@ -22,7 +23,7 @@ async def health():
         "uptime": int(time.time() - _start_time),
         "edge_tts": getattr(edge_tts, "__version__", "unknown"),
         "cache_size": len(tts_cache),
-        "voices_loaded": len(voices_list) if voices_list else 0,
+        "voices_loaded": len(tts_engine.voices_list) if tts_engine.voices_list else 0,
     }
 
 
@@ -39,5 +40,5 @@ async def get_stats():
 @router.get("/voices")
 async def list_voices(lang: str = "vi"):
     await ensure_voices_loaded()
-    filtered = [v for v in voices_list if v["Locale"].startswith(lang)]
+    filtered = [v for v in tts_engine.voices_list if v["Locale"].startswith(lang)]
     return {"voices": filtered, "total": len(filtered)}

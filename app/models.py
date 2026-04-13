@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import re
+from typing import Optional
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -16,6 +17,7 @@ class TTSRequest(BaseModel):
     rate: str = "+0%"
     volume: str = "+0%"
     pitch: str = "+0Hz"
+    ssml: bool = Field(default=False, description="If true, treat text as SSML markup")
 
     @field_validator("rate")
     @classmethod
@@ -68,4 +70,12 @@ class TTSResponse(BaseModel):
     durationSeconds: float
     chunks: int
     elapsed: float
+    cached: bool = False
+
+
+class TTSAsyncRequest(TTSRequest):
+    callback_url: Optional[str] = Field(
+        default=None,
+        description="Webhook URL to POST result when done. If None, poll /tts/async/{job_id}.",
+    )
     cached: bool = False

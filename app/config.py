@@ -30,6 +30,12 @@ class Settings(BaseSettings):
     rate_limit_max: int = 30
     rate_limit_window: int = 60
 
+    # Auth (optional — leave empty to disable)
+    api_key: str = ""
+
+    # TTS timeout per chunk (seconds)
+    tts_timeout: int = 30
+
     # Captions
     fps: int = 30
     caption_max_words: int = 6
