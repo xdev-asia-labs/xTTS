@@ -178,6 +178,7 @@ xTTS/
 ├── docker-compose.yml
 ├── Dockerfile
 ├── Makefile                 # dev, test, lint, docker shortcuts
+├── mcp_server.py            # MCP config management server (:3100)
 ├── pyproject.toml           # Python project config
 ├── README.md
 ├── requirements.txt
@@ -656,6 +657,176 @@ Frame 0                Frame 30               Frame 60
 
 Captions use frame numbers at the configured FPS (default 30).  
 To convert: `time_seconds = frame / FPS`
+
+---
+
+## 🤖 MCP Server (AI Agent Config Manager)
+
+xTTS includes an **MCP Server** (`mcp_server.py`) — a separate FastAPI service that lets AI agents (GitHub Copilot, Claude, etc.) manage xTTS configuration programmatically: view/update `.env`, restart the service, check Docker status.
+
+### Architecture
+
+```
+┌─────────────────────┐         ┌─────────────────────────┐
+│  VS Code / Copilot  │◀──────▶│  xtts-mcp (:3100)       │
+│  (MCP Client)       │  HTTP   │  mcp_server.py          │
+└─────────────────────┘         │                          │
+                                │  ├─ Read/write .env      │
+                                │  ├─ Docker restart       │
+                                │  └─ Health check xtts    │
+                                └──────────┬──────────────┘
+                                           │ docker.sock
+                                           ▼
+                                ┌─────────────────────────┐
+                                │  xtts (:3099)            │
+                                │  TTS service             │
+                                └─────────────────────────┘
+```
+
+### Start with Docker Compose
+
+Both services start together:
+
+```bash
+docker compose up -d
+
+# Verify MCP server
+curl http://localhost:3100/mcp/config/schema
+```
+
+### VS Code Integration
+
+The workspace includes [.vscode/mcp.json](.vscode/mcp.json) to register the MCP server automatically:
+
+```json
+{
+  "servers": {
+    "xtts-config": {
+      "type": "http",
+      "url": "http://localhost:3100",
+      "description": "xTTS deployment configuration manager"
+    }
+  }
+}
+```
+
+After `docker compose up -d`, reload VS Code window (`Ctrl+Shift+P` → "Reload Window") for Copilot to pick up the server.
+
+### MCP API Endpoints
+
+#### `GET /mcp/config/schema` — Config Schema
+
+Returns all valid config keys with types, defaults, and descriptions.
+
+```bash
+curl http://localhost:3100/mcp/config/schema
+```
+
+#### `GET /mcp/config` — Current Config
+
+Returns current `.env` values merged with defaults.
+
+```bash
+curl http://localhost:3100/mcp/config
+```
+
+```json
+{
+  "config": {
+    "PORT": {
+      "value": "3099",
+      "default": "3099",
+      "is_custom": false,
+      "type": "int",
+      "description": "Server port"
+    }
+  }
+}
+```
+
+#### `GET /mcp/config/{key}` — Get Single Key
+
+```bash
+curl http://localhost:3100/mcp/config/TTS_MAX_CHUNK
+```
+
+#### `PUT /mcp/config` — Update Single Key
+
+```bash
+curl -X PUT http://localhost:3100/mcp/config \
+  -H "Content-Type: application/json" \
+  -d '{"key": "TTS_MAX_CHUNK", "value": "1000"}'
+```
+
+#### `PUT /mcp/config/batch` — Update Multiple Keys
+
+```bash
+curl -X PUT http://localhost:3100/mcp/config/batch \
+  -H "Content-Type: application/json" \
+  -d '{"updates": {"TTS_MAX_CHUNK": "1000", "TTS_CONCURRENCY": "4"}}'
+```
+
+#### `POST /mcp/config/reset/{key}` — Reset Key to Default
+
+```bash
+curl -X POST http://localhost:3100/mcp/config/reset/TTS_MAX_CHUNK
+```
+
+#### `POST /mcp/config/reset` — Reset All to Defaults
+
+```bash
+curl -X POST http://localhost:3100/mcp/config/reset
+```
+
+#### `GET /mcp/service/status` — Check xTTS Health
+
+Proxies health check to the main TTS service.
+
+```bash
+curl http://localhost:3100/mcp/service/status
+```
+
+#### `POST /mcp/service/restart` — Restart xTTS Container
+
+Triggers `docker compose restart xtts` via mounted Docker socket.
+
+```bash
+curl -X POST http://localhost:3100/mcp/service/restart
+```
+
+#### `GET /mcp/docker/status` — Docker Compose Status
+
+```bash
+curl http://localhost:3100/mcp/docker/status
+```
+
+#### `GET /mcp/env/diff` — Show Custom Overrides
+
+Shows which `.env` values differ from defaults.
+
+```bash
+curl http://localhost:3100/mcp/env/diff
+```
+
+### Docker Compose Config
+
+```yaml
+xtts-mcp:
+  build: .
+  container_name: xtts-mcp
+  restart: unless-stopped
+  ports:
+    - "3100:3100"
+  volumes:
+    - ./.env:/app/.env                        # Read/write config
+    - ./.env.example:/app/.env.example:ro     # Default reference
+    - ./docker-compose.yml:/app/docker-compose.yml:ro
+    - /var/run/docker.sock:/var/run/docker.sock  # Docker control
+    - /usr/bin/docker:/usr/bin/docker:ro
+  command: ["python", "mcp_server.py"]
+```
+
+> **Note:** The Docker socket mount allows the MCP server to restart the `xtts` container. Only expose this on trusted networks.
 
 ---
 
