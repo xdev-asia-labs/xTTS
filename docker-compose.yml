@@ -5,11 +5,15 @@ services:
     restart: unless-stopped
     ports:
       - "3099:3099"
+    env_file:
+      - .env
     environment:
       - PORT=3099
       - TTS_MAX_CHUNK=500
       - TTS_MAX_RETRIES=3
       - TTS_MAX_TEXT_LENGTH=20000
+      - TTS_CACHE_SIZE=100
+      - TTS_CORS_ORIGINS=*
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3099/health"]
       interval: 30s

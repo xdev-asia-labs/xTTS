@@ -1,0 +1,81 @@
+"""
+xTTS — Lightweight TTS microservice using edge-tts.
+
+App factory: create_app() builds and configures the FastAPI application.
+"""
+from __future__ import annotations
+
+import logging
+from contextlib import asynccontextmanager
+
+import edge_tts
+from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+
+from app.config import settings
+from app.routes import system_router, tts_router
+from app.tts_engine import tts_cache
+
+log = logging.getLogger("xTTS")
+
+
+@asynccontextmanager
+async def lifespan(application: FastAPI):
+    """Startup: pre-warm voices cache. Shutdown: clear caches."""
+    log.info("Starting xTTS — pre-warming voices cache...")
+    from app.tts_engine import ensure_voices_loaded, voices_list
+
+    try:
+        await ensure_voices_loaded()
+        log.info(f"Loaded {len(voices_list)} voices")
+    except Exception as e:
+        log.warning(f"Failed to pre-warm voices: {e}")
+    yield
+    log.info("Shutting down xTTS — clearing caches")
+    tts_cache.clear()
+
+
+def create_app() -> FastAPI:
+    """Build the FastAPI application with all middleware and routes."""
+
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s [%(name)s] %(message)s",
+        datefmt="%H:%M:%S",
+    )
+
+    application = FastAPI(
+        title="xTTS",
+        version="1.1.0",
+        description="Lightweight TTS microservice using edge-tts",
+        docs_url="/docs",
+        lifespan=lifespan,
+    )
+
+    # CORS
+    application.add_middleware(
+        CORSMiddleware,
+        allow_origins=settings.cors_origins_list,
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+
+    # Global error handler
+    @application.exception_handler(Exception)
+    async def global_exception_handler(request: Request, exc: Exception):
+        log.error(
+            f"Unhandled error on {request.method} {request.url.path}: {exc}",
+            exc_info=True,
+        )
+        return JSONResponse(
+            status_code=500,
+            content={"error": "Internal server error", "detail": str(exc)},
+        )
+
+    # Routes
+    application.include_router(system_router)
+    application.include_router(tts_router)
+
+    return application
